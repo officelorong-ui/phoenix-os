@@ -58,14 +58,24 @@ type PatternResult = {
   mobilityScore: number;
   goingScore: number;
   requiredStyle: string;
+  requiredStyleReason: string;
   requiredEarlySpeed: string;
+  requiredEarlySpeedReason: string;
   requiredLateSpeed: string;
+  requiredLateSpeedReason: string;
   requiredStamina: string;
+  requiredStaminaReason: string;
   requiredMobility: string;
+  requiredMobilityReason: string;
   requiredGoingFit: string;
+  requiredGoingFitReason: string;
   dangerousFavorite: string;
+  dangerousFavoriteReason: string;
   targetLongshot: string;
+  targetLongshotReason: string;
   skipCondition: string;
+  skipConditionReason: string;
+  patternConclusion: string;
 };
 
 type PatternRecord = PatternInput & PatternMemo & PatternResult & { id: string; createdAt: string; updatedAt?: string };
@@ -179,7 +189,7 @@ function buildPatternResult(input: PatternInput): PatternResult {
   const maxScore = Math.max(earlyScore, lateScore, staminaScore, mobilityScore, goingScore);
   let patternName = "バランス型";
   if (input.gateBias === "不明" && input.styleBias === "不明" && input.trackBias === "不明" && input.pace === "読めない") patternName = "見送り型";
-  else if (input.trackBias === "前残り" || earlyScore === maxScore) patternName = input.courseScale === "小回り" ? "小回り先行機動力型" : "前残りテン性能型";
+  else if (input.trackBias === "前残り" || earlyScore === maxScore) patternName = input.courseScale === "小回り" ? "小回り前残り機動力型" : "前残りテン性能型";
   else if ((input.trackBias === "外伸び" || input.trackBias === "差し届く") && staminaScore >= 65) patternName = "外差し持続型";
   else if (goingScore === maxScore && (input.condition === "重" || input.condition === "不良" || input.trackBias === "荒れ馬場")) patternName = "重馬場パワー型";
   else if (lateScore === maxScore && (input.trackBias === "時計速い" || input.cushion === "高速" || input.cushion === "超高速")) patternName = "高速上がり型";
@@ -195,8 +205,21 @@ function buildPatternResult(input: PatternInput): PatternResult {
   const dangerousFavorite = joinParts([...new Set(dangerNotes)].slice(0, 5)) || "選択条件に合わない過剰人気馬";
   const targetLongshot = joinParts([...new Set(targetNotes)].slice(0, 5)) || "条件に合うのに近走着順で嫌われた馬";
   const skipCondition = joinParts([...(skipNotes.length ? skipNotes : []), input.pace === "読めない" ? "ペースが読めず型を絞れない" : "想定ペースと馬場傾向が矛盾する", input.gateBias === "不明" && input.styleBias === "不明" && input.trackBias === "不明" ? "バイアスが全く読めない" : "型に合う馬を言語化できない"]);
+  const topReason = (items: string[], fallback: string) => [...new Set(items)].slice(0, 2).join("、") || fallback;
+  const requiredStyleReason = topReason(styleNotes, "選択条件から脚質の優位性がまだ強く出ていないため");
+  const requiredEarlySpeedReason = earlyScore >= 70 ? "前残り・短い直線・短距離・先行有利の条件が重なっているため" : earlyScore >= 55 ? "一定の位置取り性能が必要な条件があるため" : "テンよりも直線性能や持続力を重視する条件のため";
+  const requiredLateSpeedReason = lateScore >= 70 ? "大箱・長い直線・差し有利・高速馬場の条件が重なっているため" : lateScore >= 55 ? "直線で伸びる性能が必要な条件があるため" : "上がりだけでは届きにくい条件のため";
+  const requiredStaminaReason = staminaScore >= 70 ? "ハイペース・坂・道悪・時計のかかる馬場で消耗戦になりやすいため" : staminaScore >= 55 ? "最後まで脚を使う持続力が必要な条件があるため" : "持続力より位置取りや瞬発力を優先する条件のため";
+  const requiredMobilityReason = mobilityScore >= 70 ? "小回り・直線短い・内有利・前残りでコーナーの立ち回りが重要なため" : mobilityScore >= 55 ? "ロスなく動ける機動力が必要な条件があるため" : "機動力より直線性能や馬場適性を重視する条件のため";
+  const requiredGoingFitReason = goingScore >= 70 ? "重不良・低いクッション値・高い含水率・荒れ馬場で馬場適性の差が出やすいため" : goingScore >= 55 ? "今の馬場を苦にしない対応力が必要なため" : "馬場適性より展開やスピードを重視する条件のため";
+  const dangerousFavoriteReason = topReason(dangerNotes, "人気ではなく、今回の型に合うかを優先して判断するため");
+  const targetLongshotReason = topReason(targetNotes, "近走着順より、今回条件との一致を評価できるため");
+  const skipConditionReason = patternName === "見送り型" ? "ペースやバイアスが読めず、型の再現性を検証しにくいため" : "買う根拠を言語化できない時点で、Phoenix OSの勝負条件から外れるため";
+  const patternConclusion = patternName === "見送り型"
+    ? "このレースは「見送り型」。条件の不明点が多く、勝ち馬像を絞り切れない。無理に買わず、結果を見て型の材料を集めるレース。"
+    : "このレースは「" + patternName + "」。狙うべきは、" + targetLongshot + "。必要な脚質は「" + requiredStyle + "」。" + dangerousFavorite + "は危険。";
 
-  return { patternName, earlyScore, lateScore, staminaScore, mobilityScore, goingScore, requiredStyle, requiredEarlySpeed, requiredLateSpeed, requiredStamina, requiredMobility, requiredGoingFit, dangerousFavorite, targetLongshot, skipCondition };
+  return { patternName, earlyScore, lateScore, staminaScore, mobilityScore, goingScore, requiredStyle, requiredStyleReason, requiredEarlySpeed, requiredEarlySpeedReason, requiredLateSpeed, requiredLateSpeedReason, requiredStamina, requiredStaminaReason, requiredMobility, requiredMobilityReason, requiredGoingFit, requiredGoingFitReason, dangerousFavorite, dangerousFavoriteReason, targetLongshot, targetLongshotReason, skipCondition, skipConditionReason, patternConclusion };
 }
 
 function parseHorseCsv(text: string): HorseRow[] {
@@ -245,6 +268,7 @@ export default function Home() {
       pattern.avoidConditions,
       pattern.marketGap,
       pattern.finalMemo,
+      pattern.patternConclusion,
     ].filter(Boolean).join(" ").toLowerCase();
     return (!normalizedQuery || searchableText.includes(normalizedQuery)) && (surfaceFilter === "すべて" || pattern.surface === surfaceFilter) && (conditionFilter === "すべて" || pattern.condition === conditionFilter);
   }), [patterns, query, surfaceFilter, conditionFilter]);
@@ -330,7 +354,7 @@ export default function Home() {
             <label className="wide">過去レース傾向メモ<textarea value={input.trendMemo} onChange={(event) => updateInput("trendMemo", event.target.value)} rows={4} /></label>
           </div>
         </section>
-        <aside className="panel resultPanel"><p className="eyebrow">Pattern Result</p><h2>型判定結果</h2><div className="patternNameBox"><span>総合的な型名</span><strong>{result.patternName}</strong></div><div className="scoreGrid"><ScoreItem label="テン" value={result.earlyScore} /><ScoreItem label="上がり" value={result.lateScore} /><ScoreItem label="持続" value={result.staminaScore} /><ScoreItem label="機動力" value={result.mobilityScore} /><ScoreItem label="馬場適性" value={result.goingScore} /></div><ResultItem title="必要な脚質" text={result.requiredStyle} /><ResultItem title="必要なテン性能" text={result.requiredEarlySpeed} /><ResultItem title="必要な上がり性能" text={result.requiredLateSpeed} /><ResultItem title="必要な持続力" text={result.requiredStamina} /><ResultItem title="必要な機動力" text={result.requiredMobility} /><ResultItem title="必要な馬場適性" text={result.requiredGoingFit} /><ResultItem title="危険な人気馬の特徴" text={result.dangerousFavorite} /><ResultItem title="狙いたい穴馬の特徴" text={result.targetLongshot} /><ResultItem title="見送り条件" text={result.skipCondition} /></aside>
+        <aside className="panel resultPanel"><p className="eyebrow">Pattern Result</p><h2>型判定結果</h2><div className="patternNameBox"><span>総合的な型名</span><strong>{result.patternName}</strong></div><div className="conclusionBox"><span>型の結論</span><p>{result.patternConclusion}</p></div><div className="scoreGrid"><ScoreItem label="テン" value={result.earlyScore} /><ScoreItem label="上がり" value={result.lateScore} /><ScoreItem label="持続" value={result.staminaScore} /><ScoreItem label="機動力" value={result.mobilityScore} /><ScoreItem label="馬場適性" value={result.goingScore} /></div><ResultItem title="必要な脚質" text={result.requiredStyle} reason={result.requiredStyleReason} /><ResultItem title="必要なテン性能" text={result.requiredEarlySpeed} reason={result.requiredEarlySpeedReason} /><ResultItem title="必要な上がり性能" text={result.requiredLateSpeed} reason={result.requiredLateSpeedReason} /><ResultItem title="必要な持続力" text={result.requiredStamina} reason={result.requiredStaminaReason} /><ResultItem title="必要な機動力" text={result.requiredMobility} reason={result.requiredMobilityReason} /><ResultItem title="必要な馬場適性" text={result.requiredGoingFit} reason={result.requiredGoingFitReason} /><ResultItem title="危険な人気馬の特徴" text={result.dangerousFavorite} reason={result.dangerousFavoriteReason} /><ResultItem title="狙いたい穴馬の特徴" text={result.targetLongshot} reason={result.targetLongshotReason} /><ResultItem title="見送り条件" text={result.skipCondition} reason={result.skipConditionReason} /></aside>
         <section className="panel memoPanel"><p className="eyebrow">Pattern Notes</p><h2>型メモ</h2><div className="memoGrid"><label>このレースの結論<textarea value={memo.conclusion} onChange={(event) => updateMemo("conclusion", event.target.value)} rows={3} /></label><label>買いたい馬の条件<textarea value={memo.buyConditions} onChange={(event) => updateMemo("buyConditions", event.target.value)} rows={3} /></label><label>買わない馬の条件<textarea value={memo.avoidConditions} onChange={(event) => updateMemo("avoidConditions", event.target.value)} rows={3} /></label><label>世の中とズレているポイント<textarea value={memo.marketGap} onChange={(event) => updateMemo("marketGap", event.target.value)} rows={3} /></label><label className="wide">最終判断メモ<textarea value={memo.finalMemo} onChange={(event) => updateMemo("finalMemo", event.target.value)} rows={4} /></label></div></section>
       </form>
       <section className="panel listPanel"><div className="panelHeader"><div><p className="eyebrow">Pattern Archive</p><h2>型一覧</h2></div><span className="badge">{filteredPatterns.length}件</span></div><div className="filters"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="日付、レース番号、型名、競馬場、メモで検索" /><select value={surfaceFilter} onChange={(event) => setSurfaceFilter(event.target.value as "すべて" | Surface)}><option>すべて</option><option>芝</option><option>ダート</option></select><select value={conditionFilter} onChange={(event) => setConditionFilter(event.target.value as "すべて" | TrackCondition)}><option>すべて</option><option>良</option><option>稍重</option><option>重</option><option>不良</option></select></div><div className="patternList">{filteredPatterns.map((pattern) => <article key={pattern.id}><div><strong>{formatRaceDate(pattern.date)} {pattern.raceNumber || "R未設定"} / {pattern.venue} {pattern.surface}{pattern.distance}m</strong><span>{pattern.patternName} / {pattern.condition} / {pattern.pace} / {pattern.trackBias}</span><span>更新: {formatDate(pattern.updatedAt || pattern.createdAt)}</span></div><p>{pattern.requiredStyle}</p><div className="rowActions"><button type="button" className="textButton" onClick={() => startEdit(pattern)}>編集</button><button type="button" className="textButton dangerButton" onClick={() => deletePattern(pattern.id)}>削除</button></div></article>)}{!filteredPatterns.length && <p className="empty">まだ型がありません。</p>}</div></section>
@@ -347,6 +371,6 @@ function ScoreItem({ label, value }: { label: string; value: number }) {
   return <article className="scoreItem"><span>{label}</span><strong>{value}</strong></article>;
 }
 
-function ResultItem({ title, text }: { title: string; text: string }) {
-  return <article className="resultItem"><span>{title}</span><p>{text}</p></article>;
+function ResultItem({ title, text, reason }: { title: string; text: string; reason?: string }) {
+  return <article className="resultItem"><span>{title}</span><p>{text}</p>{reason && <small>理由: {reason}</small>}</article>;
 }
