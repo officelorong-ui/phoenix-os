@@ -18,8 +18,11 @@ type FieldSize = "少頭数" | "標準" | "多頭数";
 type GateBias = "内有利" | "外有利" | "フラット" | "不明";
 type StyleBias = "逃げ有利" | "先行有利" | "差し有利" | "追い込み有利" | "フラット" | "不明";
 type TrackBias = "内伸び" | "外伸び" | "前残り" | "差し届く" | "時計速い" | "時計かかる" | "荒れ馬場" | "フラット" | "不明";
+type RaceNumber = "1R" | "2R" | "3R" | "4R" | "5R" | "6R" | "7R" | "8R" | "9R" | "10R" | "11R" | "12R";
 
 type PatternInput = {
+  date: string;
+  raceNumber: RaceNumber;
   venue: Venue;
   surface: Surface;
   distance: Distance;
@@ -71,8 +74,11 @@ type HorseRow = { horseName: string; jockey: string; popularity: string; odds: s
 const storageKey = "phoenix-os-simple-patterns";
 const venues: Venue[] = ["札幌", "函館", "福島", "新潟", "東京", "中山", "中京", "京都", "阪神", "小倉", "門別", "その他"];
 const distances: Distance[] = ["1000", "1150", "1200", "1400", "1600", "1700", "1800", "2000", "2200", "2400", "2500", "2600", "その他"];
+const raceNumbers: RaceNumber[] = ["1R", "2R", "3R", "4R", "5R", "6R", "7R", "8R", "9R", "10R", "11R", "12R"];
 
 const initialInput: PatternInput = {
+  date: "",
+  raceNumber: "1R",
   venue: "東京",
   surface: "芝",
   distance: "1600",
@@ -222,8 +228,25 @@ export default function Home() {
 
   const result = useMemo(() => buildPatternResult(input), [input]);
   const filteredPatterns = useMemo(() => patterns.filter((pattern) => {
-    const text = [pattern.venue, pattern.distance, pattern.surface, pattern.condition, pattern.conclusion, pattern.buyConditions, pattern.trackBias].join(" ");
-    return text.includes(query) && (surfaceFilter === "すべて" || pattern.surface === surfaceFilter) && (conditionFilter === "すべて" || pattern.condition === conditionFilter);
+    const normalizedQuery = query.trim().toLowerCase();
+    const searchableText = [
+      pattern.date,
+      pattern.raceNumber,
+      pattern.patternName,
+      pattern.venue,
+      pattern.distance,
+      pattern.surface,
+      pattern.condition,
+      pattern.pace,
+      pattern.trackBias,
+      pattern.trendMemo,
+      pattern.conclusion,
+      pattern.buyConditions,
+      pattern.avoidConditions,
+      pattern.marketGap,
+      pattern.finalMemo,
+    ].filter(Boolean).join(" ").toLowerCase();
+    return (!normalizedQuery || searchableText.includes(normalizedQuery)) && (surfaceFilter === "すべて" || pattern.surface === surfaceFilter) && (conditionFilter === "すべて" || pattern.condition === conditionFilter);
   }), [patterns, query, surfaceFilter, conditionFilter]);
 
   const candidateRows = useMemo(() => {
@@ -250,7 +273,7 @@ export default function Home() {
   }
   function startEdit(pattern: PatternRecord) {
     setEditingId(pattern.id);
-    setInput({ venue: pattern.venue, surface: pattern.surface, distance: pattern.distance, turn: pattern.turn, layout: pattern.layout, straightLength: pattern.straightLength, courseScale: pattern.courseScale, hill: pattern.hill, condition: pattern.condition, cushion: pattern.cushion, moisture: pattern.moisture, pace: pattern.pace, fieldSize: pattern.fieldSize, gateBias: pattern.gateBias, styleBias: pattern.styleBias, trackBias: pattern.trackBias, trendMemo: pattern.trendMemo });
+    setInput({ date: pattern.date || "", raceNumber: pattern.raceNumber || "1R", venue: pattern.venue, surface: pattern.surface, distance: pattern.distance, turn: pattern.turn, layout: pattern.layout, straightLength: pattern.straightLength, courseScale: pattern.courseScale, hill: pattern.hill, condition: pattern.condition, cushion: pattern.cushion, moisture: pattern.moisture, pace: pattern.pace, fieldSize: pattern.fieldSize, gateBias: pattern.gateBias, styleBias: pattern.styleBias, trackBias: pattern.trackBias, trendMemo: pattern.trendMemo || "" });
     setMemo({ conclusion: pattern.conclusion || "", buyConditions: pattern.buyConditions || "", avoidConditions: pattern.avoidConditions || "", marketGap: pattern.marketGap || "", finalMemo: pattern.finalMemo || "" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -262,6 +285,15 @@ export default function Home() {
   function formatDate(value?: string) {
     if (!value) return "未記録";
     return new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+  }
+  function formatRaceDate(value?: string) {
+    if (!value) return "日付未設定";
+    return new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(new Date(`${value}T00:00:00`));
+  }
+  function deletePattern(patternId: string) {
+    if (!window.confirm("本当に削除しますか？")) return;
+    setPatterns((current) => current.filter((pattern) => pattern.id !== patternId));
+    if (editingId === patternId) cancelEdit();
   }
   function handleCsv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -277,6 +309,8 @@ export default function Home() {
       <form className="mainGrid" onSubmit={savePattern}>
         <section className="panel formPanel"><div className="panelHeader"><div><p className="eyebrow">{editingId ? "Update Mode" : "Pattern Builder"}</p><h2>{editingId ? "更新モード" : "型作成画面"}</h2></div><div className="formActions"><button type="submit">{editingId ? "型を更新" : "型を保存"}</button>{editingId && <button type="button" className="quietButton" onClick={cancelEdit}>キャンセル</button>}</div></div>
           <div className="formGrid">
+            <label>日付<input type="date" value={input.date} onChange={(event) => updateInput("date", event.target.value)} /></label>
+            <SelectField label="レース番号" value={input.raceNumber} options={raceNumbers} onChange={(value) => updateInput("raceNumber", value as RaceNumber)} />
             <SelectField label="競馬場" value={input.venue} options={venues} onChange={(value) => updateInput("venue", value as Venue)} />
             <SelectField label="芝/ダート" value={input.surface} options={["芝", "ダート"]} onChange={(value) => updateInput("surface", value as Surface)} />
             <SelectField label="距離" value={input.distance} options={distances} onChange={(value) => updateInput("distance", value as Distance)} />
@@ -299,7 +333,7 @@ export default function Home() {
         <aside className="panel resultPanel"><p className="eyebrow">Pattern Result</p><h2>型判定結果</h2><div className="patternNameBox"><span>総合的な型名</span><strong>{result.patternName}</strong></div><div className="scoreGrid"><ScoreItem label="テン" value={result.earlyScore} /><ScoreItem label="上がり" value={result.lateScore} /><ScoreItem label="持続" value={result.staminaScore} /><ScoreItem label="機動力" value={result.mobilityScore} /><ScoreItem label="馬場適性" value={result.goingScore} /></div><ResultItem title="必要な脚質" text={result.requiredStyle} /><ResultItem title="必要なテン性能" text={result.requiredEarlySpeed} /><ResultItem title="必要な上がり性能" text={result.requiredLateSpeed} /><ResultItem title="必要な持続力" text={result.requiredStamina} /><ResultItem title="必要な機動力" text={result.requiredMobility} /><ResultItem title="必要な馬場適性" text={result.requiredGoingFit} /><ResultItem title="危険な人気馬の特徴" text={result.dangerousFavorite} /><ResultItem title="狙いたい穴馬の特徴" text={result.targetLongshot} /><ResultItem title="見送り条件" text={result.skipCondition} /></aside>
         <section className="panel memoPanel"><p className="eyebrow">Pattern Notes</p><h2>型メモ</h2><div className="memoGrid"><label>このレースの結論<textarea value={memo.conclusion} onChange={(event) => updateMemo("conclusion", event.target.value)} rows={3} /></label><label>買いたい馬の条件<textarea value={memo.buyConditions} onChange={(event) => updateMemo("buyConditions", event.target.value)} rows={3} /></label><label>買わない馬の条件<textarea value={memo.avoidConditions} onChange={(event) => updateMemo("avoidConditions", event.target.value)} rows={3} /></label><label>世の中とズレているポイント<textarea value={memo.marketGap} onChange={(event) => updateMemo("marketGap", event.target.value)} rows={3} /></label><label className="wide">最終判断メモ<textarea value={memo.finalMemo} onChange={(event) => updateMemo("finalMemo", event.target.value)} rows={4} /></label></div></section>
       </form>
-      <section className="panel listPanel"><div className="panelHeader"><div><p className="eyebrow">Pattern Archive</p><h2>型一覧</h2></div><span className="badge">{filteredPatterns.length}件</span></div><div className="filters"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="競馬場、距離、メモで検索" /><select value={surfaceFilter} onChange={(event) => setSurfaceFilter(event.target.value as "すべて" | Surface)}><option>すべて</option><option>芝</option><option>ダート</option></select><select value={conditionFilter} onChange={(event) => setConditionFilter(event.target.value as "すべて" | TrackCondition)}><option>すべて</option><option>良</option><option>稍重</option><option>重</option><option>不良</option></select></div><div className="patternList">{filteredPatterns.map((pattern) => <article key={pattern.id}><div><strong>{pattern.venue} {pattern.surface}{pattern.distance}m</strong><span>{pattern.condition} / {pattern.pace} / {pattern.trackBias}</span><span>更新: {formatDate(pattern.updatedAt || pattern.createdAt)}</span></div><p>{pattern.requiredStyle}</p><div className="rowActions"><button type="button" className="textButton" onClick={() => startEdit(pattern)}>編集</button></div></article>)}{!filteredPatterns.length && <p className="empty">まだ型がありません。</p>}</div></section>
+      <section className="panel listPanel"><div className="panelHeader"><div><p className="eyebrow">Pattern Archive</p><h2>型一覧</h2></div><span className="badge">{filteredPatterns.length}件</span></div><div className="filters"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="日付、レース番号、型名、競馬場、メモで検索" /><select value={surfaceFilter} onChange={(event) => setSurfaceFilter(event.target.value as "すべて" | Surface)}><option>すべて</option><option>芝</option><option>ダート</option></select><select value={conditionFilter} onChange={(event) => setConditionFilter(event.target.value as "すべて" | TrackCondition)}><option>すべて</option><option>良</option><option>稍重</option><option>重</option><option>不良</option></select></div><div className="patternList">{filteredPatterns.map((pattern) => <article key={pattern.id}><div><strong>{formatRaceDate(pattern.date)} {pattern.raceNumber || "R未設定"} / {pattern.venue} {pattern.surface}{pattern.distance}m</strong><span>{pattern.patternName} / {pattern.condition} / {pattern.pace} / {pattern.trackBias}</span><span>更新: {formatDate(pattern.updatedAt || pattern.createdAt)}</span></div><p>{pattern.requiredStyle}</p><div className="rowActions"><button type="button" className="textButton" onClick={() => startEdit(pattern)}>編集</button><button type="button" className="textButton dangerButton" onClick={() => deletePattern(pattern.id)}>削除</button></div></article>)}{!filteredPatterns.length && <p className="empty">まだ型がありません。</p>}</div></section>
       <section className="panel subPanel"><details><summary>補助機能: CSVを読み込んで参考馬を表示</summary><div className="csvBox"><input type="file" accept=".csv,text/csv" onChange={handleCsv} /><p>CSVは補助機能です。読み込めた場合のみ、型に合う可能性のある馬を参考表示します。</p></div><div className="candidateList">{candidateRows.map((row) => <article key={row.horseName}><strong>{row.horseName}</strong><span>{row.jockey} / {row.popularity}人気 / {row.odds}倍</span><p>{row.match}</p></article>)}</div></details></section>
     </main>
   );
